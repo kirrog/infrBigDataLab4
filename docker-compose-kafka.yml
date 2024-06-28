@@ -1,6 +1,4 @@
-
 version: "3"
-
 services:
   zookeeper:
     image: confluentinc/cp-zookeeper:5.4.0
@@ -11,6 +9,8 @@ services:
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - broker-kafka
 
   broker:
     image: confluentinc/cp-server:5.4.0
@@ -20,7 +20,7 @@ services:
       - zookeeper
     ports:
       - "9092:9092"
-      - "29093:29093"
+      - "29092:29092"
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
@@ -35,6 +35,8 @@ services:
       CONFLUENT_METRICS_REPORTER_TOPIC_REPLICAS: 1
       CONFLUENT_METRICS_ENABLE: "true"
       CONFLUENT_SUPPORT_CUSTOMER_ID: "anonymous"
+    networks:
+      - broker-kafka
 
   kafka-tools:
     image: confluentinc/cp-kafka:5.4.0
@@ -55,6 +57,8 @@ services:
     environment:
       SCHEMA_REGISTRY_HOST_NAME: schema-registry
       SCHEMA_REGISTRY_KAFKASTORE_CONNECTION_URL: "zookeeper:2181"
+    networks:
+      - broker-kafka
 
   control-center:
     image: confluentinc/cp-enterprise-control-center:5.4.0
@@ -75,12 +79,14 @@ services:
       CONTROL_CENTER_MONITORING_INTERCEPTOR_TOPIC_PARTITIONS: 1
       CONFLUENT_METRICS_TOPIC_REPLICATION: 1
       PORT: 9021
+    networks:
+      - broker-kafka
 
   kafka-ui:
     image: provectuslabs/kafka-ui
     container_name: kafka-ui
     ports:
-      - "8080:8080"
+      - "8800:8080"
     restart: always
     environment:
       - KAFKA_CLUSTERS_0_NAME=local
@@ -88,3 +94,58 @@ services:
       - KAFKA_CLUSTERS_0_ZOOKEEPER=zookeeper:2181
       - KAFKA_CLUSTERS_0_PROPERTIES_SECURITY_PROTOCOL=PLAINTEXT
       - KAFKA_CLUSTERS_0_SCHEMAREGISTRY=http://schema-registry:8081
+    networks:
+      - broker-kafka
+
+#  orders_backend:
+#    restart: always
+#    image: orders_backend:v1
+#    ports:
+#      - "5002:5002"
+#    networks:
+#      - broker-kafka
+
+  cassandra-node1:
+    image: bitnami/cassandra:latest
+    restart: always
+    volumes:
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    environment:
+      - CASSANDRA_CLUSTER_NAME=cassandra-cluster
+      - CASSANDRA_SEEDS=cassandra-node1
+      - CASSANDRA_PASSWORD_SEEDER=yes
+      - CASSANDRA_PASSWORD=${CASSANDRA_PASSWORD}
+      - CASSANDRA_DATACENTER=datacenter1
+    networks:
+      - broker-kafka
+
+  backend_producer:
+    restart: always
+    image: kirrog/producer:v1
+    ports:
+      - "5003:5003"
+    depends_on:
+      - broker
+      - backend_dumper
+    networks:
+      - broker-kafka
+
+  backend_dumper:
+    restart: always
+    image: kirrog/dumper:v1
+    environment:
+      - CASSANDRA_SEEDS=cassandra-node1
+      - CASSANDRA_PASSWORD=${CASSANDRA_PASSWORD}
+      - CASSANDRA_USERNAME=${CASSANDRA_USERNAME}
+      - CASSANDRA_PORT=${CASSANDRA_PORT}
+    ports:
+      - "5002:5002"
+    depends_on:
+      - broker
+      - cassandra-node1
+    networks:
+      - broker-kafka
+
+networks:
+  broker-kafka:
+    driver: bridge

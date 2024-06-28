@@ -4,34 +4,39 @@ import time
 from kafka import KafkaProducer
 from flask import Flask, jsonify, request
 
-ORDER_KAFKA_TOPIC = 'order_details'
-KAFKA_SERVER_ADDRESS = 'localhost:9092'
-# KAFKA_SERVER_ADDRESS = 'broker:29092'
-# KAFKA_SERVER_ADDRESS = '47.93.191.241:29093`
+from src.loggers import create_logger
+from src.predict import Predictor
+from src.seed_data import SeedData
 
+ORDER_KAFKA_TOPIC = 'seeds_data'
+KAFKA_SERVER_ADDRESS = 'broker:29092'
 app = Flask(__name__)
 
-## from inside docker compose network - when add the service to compose file -> orders_backend:v1
-producer = KafkaProducer(bootstrap_servers=[KAFKA_SERVER_ADDRESS], security_protocol="PLAINTEXT",
-                              value_serializer=lambda x: json.dumps(x).encode('utf-8'))
+cstm_logger = create_logger(__name__)
 
-# post endpoint to get user id , order id, user email, and order details
-@app.route('/order', methods=['POST'])
-def order():
-    user_id = request.json['user_id']
-    order_id = request.json['order_id']
-    user_email = request.json['user_email']
-    order_details = request.json['order_details']
-    order = {}
-    order['user_id'] = user_id
-    order['order_id'] = order_id
-    order['user_email'] = user_email
-    order['order_details'] = order_details
-    order['time'] = time.time()
-    producer.send(ORDER_KAFKA_TOPIC, order)
-    print("Sent order details {} to kafka topic: {}".format(order, ORDER_KAFKA_TOPIC))
-    return jsonify(order)
+producer = KafkaProducer(bootstrap_servers=[KAFKA_SERVER_ADDRESS], security_protocol="PLAINTEXT",
+                         value_serializer=lambda x: json.dumps(x).encode('utf-8'))
+
+
+@app.route('/')
+def check():
+    return 'Flask is running!'
+
+
+@app.route('/predict', methods=['POST'])
+def predict_by_model():
+    data = request.json
+    model = Predictor()
+    seed_data_instance = SeedData(data)
+    floats = [seed_data_instance.return_floats()]
+    y_result_data = int(model.predict_by_model(floats)[0])
+    cstm_logger.warning(f"Prediction result is: {y_result_data}")
+    seed_data_instance.set_prediction(y_result_data)
+    result_instance =  {k: v for k, v in seed_data_instance.__dict__.items()}
+    result_instance['time'] = time.time()
+    producer.send(ORDER_KAFKA_TOPIC, result_instance)
+    return jsonify(result_instance)
 
 
 if __name__ == '__main__':
-    app.run(host="0.0.0.0", port=5002, debug=True)
+    app.run(debug=True, port=5003, host="0.0.0.0")
