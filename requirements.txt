@@ -1,0 +1,5 @@
+scikit-learn~=1.4.2
+pandas~=2.2.2
+dvc==3.50.0
+flask==3.0.3
+cassandra-driver==3.29.1

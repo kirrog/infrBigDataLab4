@@ -1,0 +1,26 @@
+stages:
+  preprocess:
+    cmd: python -m src.preprocess
+    deps:
+      - data/seeds.csv
+      - src/preprocess.py
+    outs:
+      - data/test_data.csv
+      - data/train_data.csv
+      - data/validation_data.csv
+  train:
+    cmd: python -m src.train
+    deps:
+      - data/test_data.csv
+      - data/train_data.csv
+      - src/train.py
+    outs:
+      - experiments/svc/model.pkl
+    metrics:
+      - experiments/svc/metrics.json
+  predict:
+    cmd: python -m src.predict
+    deps:
+      - data/validation_data.csv
+      - experiments/svc/model.pkl
+      - src/predict.py

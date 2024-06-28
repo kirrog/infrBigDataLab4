@@ -1,0 +1,40 @@
+services:
+  cassandra-node1:
+    image: bitnami/cassandra:latest
+    volumes:
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    environment:
+      - CASSANDRA_CLUSTER_NAME=cassandra-cluster
+      - CASSANDRA_SEEDS=cassandra-node1 #,cassandra-node2,cassandra-node3
+      - CASSANDRA_PASSWORD_SEEDER=yes
+      - CASSANDRA_PASSWORD=password123
+      - CASSANDRA_DATACENTER=datacenter1
+
+#  cassandra-node2:
+#    image: bitnami/cassandra:latest
+#    environment:
+#      - CASSANDRA_CLUSTER_NAME=cassandra-cluster
+#      - CASSANDRA_SEEDS=cassandra-node1,cassandra-node2,cassandra-node3
+#      - CASSANDRA_PASSWORD=${CASSANDRA_PASSWORD}
+#      - CASSANDRA_DATACENTER=datacenter1
+#
+#  cassandra-node3:
+#    image: bitnami/cassandra:latest
+#    environment:
+#      - CASSANDRA_CLUSTER_NAME=cassandra-cluster
+#      - CASSANDRA_SEEDS=cassandra-node1,cassandra-node2,cassandra-node3
+#      - CASSANDRA_PASSWORD=${CASSANDRA_PASSWORD}
+#      - CASSANDRA_DATACENTER=datacenter1
+
+  web-app:
+    image: kirrog76/infr_big_data:v1
+    restart: on-failure
+    environment:
+      - CASSANDRA_SEEDS=cassandra-node1 #,cassandra-node2,cassandra-node3
+      - CASSANDRA_PASSWORD=${CASSANDRA_PASSWORD}
+      - CASSANDRA_USERNAME=${CASSANDRA_USERNAME}
+      - CASSANDRA_PORT=${CASSANDRA_PORT}
+    ports:
+      - 5555:5555
+    depends_on:
+      - cassandra-node1
